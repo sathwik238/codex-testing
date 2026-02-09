@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Interactive Playground</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="hero">
+      <div>
+        <p class="eyebrow">Three interactive choices</p>
+        <h1>Play. Calculate. Create.</h1>
+        <p class="subtitle">
+          Switch between a live calculator, a strategic Tic Tac Toe board, and a
+          color-and-sound studio.
+        </p>
+      </div>
+      <div class="hero-actions">
+        <button class="primary" data-panel-target="calculator">Open Calculator</button>
+        <button class="ghost" data-panel-target="tic-tac-toe">Play Tic Tac Toe</button>
+        <button class="ghost" data-panel-target="studio">Enter Studio</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="panel-tabs">
+        <button class="tab active" data-panel-target="calculator">Calculator</button>
+        <button class="tab" data-panel-target="tic-tac-toe">Tic Tac Toe</button>
+        <button class="tab" data-panel-target="studio">Color + Sound Studio</button>
+      </section>
+
+      <section class="panels">
+        <article id="calculator" class="panel active">
+          <div class="panel-header">
+            <h2>Calculator</h2>
+            <p>Type, click, or use your keyboard. Press Enter to evaluate.</p>
+          </div>
+          <div class="calculator">
+            <div class="calc-display">
+              <input id="calc-input" type="text" placeholder="0" />
+              <div id="calc-history" class="calc-history">Ready.</div>
+            </div>
+            <div class="calc-buttons">
+              <button data-action="clear" class="span-2">AC</button>
+              <button data-action="delete">DEL</button>
+              <button data-value="/">÷</button>
+              <button data-value="7">7</button>
+              <button data-value="8">8</button>
+              <button data-value="9">9</button>
+              <button data-value="*">×</button>
+              <button data-value="4">4</button>
+              <button data-value="5">5</button>
+              <button data-value="6">6</button>
+              <button data-value="-">−</button>
+              <button data-value="1">1</button>
+              <button data-value="2">2</button>
+              <button data-value="3">3</button>
+              <button data-value="+">+</button>
+              <button data-value="0" class="span-2">0</button>
+              <button data-value=".">.</button>
+              <button data-action="equals" class="equals">=</button>
+            </div>
+          </div>
+        </article>
+
+        <article id="tic-tac-toe" class="panel">
+          <div class="panel-header">
+            <h2>Tic Tac Toe</h2>
+            <p>Tap a square to place a mark. First to three wins.</p>
+          </div>
+          <div class="ttt">
+            <div class="ttt-status" id="ttt-status">Player X's turn</div>
+            <div class="ttt-board" id="ttt-board">
+              <button class="cell" data-index="0"></button>
+              <button class="cell" data-index="1"></button>
+              <button class="cell" data-index="2"></button>
+              <button class="cell" data-index="3"></button>
+              <button class="cell" data-index="4"></button>
+              <button class="cell" data-index="5"></button>
+              <button class="cell" data-index="6"></button>
+              <button class="cell" data-index="7"></button>
+              <button class="cell" data-index="8"></button>
+            </div>
+            <div class="ttt-actions">
+              <button id="ttt-reset" class="primary">Reset Board</button>
+              <button id="ttt-swap" class="ghost">Swap Starter</button>
+            </div>
+          </div>
+        </article>
+
+        <article id="studio" class="panel">
+          <div class="panel-header">
+            <h2>Color + Sound Studio</h2>
+            <p>Blend a gradient and play tone pads to create your own vibe.</p>
+          </div>
+          <div class="studio">
+            <div class="gradient-preview" id="gradient-preview">
+              <div>
+                <h3>Live Gradient</h3>
+                <p id="gradient-label">Move sliders to update.</p>
+              </div>
+            </div>
+            <div class="studio-controls">
+              <div class="slider-group">
+                <label for="color-a">Color A</label>
+                <input type="color" id="color-a" value="#6b7bff" />
+              </div>
+              <div class="slider-group">
+                <label for="color-b">Color B</label>
+                <input type="color" id="color-b" value="#ff8fe5" />
+              </div>
+              <div class="slider-group">
+                <label for="angle">Gradient Angle (<span id="angle-value">45</span>°)</label>
+                <input type="range" id="angle" min="0" max="360" value="45" />
+              </div>
+              <button id="copy-gradient" class="ghost">Copy CSS Gradient</button>
+              <p id="copy-status" class="copy-status">Click to copy the CSS.</p>
+            </div>
+          </div>
+          <div class="sound-pad">
+            <h3>Sound Pads</h3>
+            <div class="pad-grid">
+              <button class="pad" data-tone="261.63">C</button>
+              <button class="pad" data-tone="293.66">D</button>
+              <button class="pad" data-tone="329.63">E</button>
+              <button class="pad" data-tone="349.23">F</button>
+              <button class="pad" data-tone="392.00">G</button>
+              <button class="pad" data-tone="440.00">A</button>
+              <button class="pad" data-tone="493.88">B</button>
+              <button class="pad" data-tone="523.25">C2</button>
+            </div>
+            <div class="pad-controls">
+              <label for="volume">Volume</label>
+              <input type="range" id="volume" min="0" max="1" step="0.05" value="0.6" />
+              <label for="wave">Wave</label>
+              <select id="wave">
+                <option value="sine">Sine</option>
+                <option value="triangle">Triangle</option>
+                <option value="square">Square</option>
+                <option value="sawtooth">Sawtooth</option>
+              </select>
+            </div>
+          </div>
+        </article>
+      </section>
+    </main>
+
+    <footer>
+      <p>Tip: Use your keyboard for calculator input and sound pad triggers (A-K).</p>
+    </footer>
+
+    <script src="script.js"></script>
+  </body>
+</html>
