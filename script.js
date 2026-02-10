@@ -83,10 +83,7 @@ function renderBoard() {
       square.dataset.col = col;
 
       if (cell) {
-        const pieceGlyph = document.createElement("span");
-        pieceGlyph.className = `piece piece-${cell.color === "w" ? "white" : "black"}`;
-        pieceGlyph.textContent = unicodePieces[cell.color][cell.type];
-        square.appendChild(pieceGlyph);
+        square.textContent = unicodePieces[cell.color][cell.type];
       }
 
       if (selectedSquare && selectedSquare.row === row && selectedSquare.col === col) {
@@ -336,12 +333,12 @@ function renderMoveHistory() {
 }
 
 function renderCaptured() {
-  capturedWhiteEl.innerHTML = captured.w.length
-    ? captured.w.map((capturedPiece) => `<span class="piece piece-${capturedPiece.color === "w" ? "white" : "black"} captured-piece">${unicodePieces[capturedPiece.color][capturedPiece.type]}</span>`).join(" ")
+  capturedWhiteEl.textContent = captured.w.length
+    ? captured.w.map((p) => unicodePieces[p.color][p.type]).join(" ")
     : "—";
 
-  capturedBlackEl.innerHTML = captured.b.length
-    ? captured.b.map((capturedPiece) => `<span class="piece piece-${capturedPiece.color === "w" ? "white" : "black"} captured-piece">${unicodePieces[capturedPiece.color][capturedPiece.type]}</span>`).join(" ")
+  capturedBlackEl.textContent = captured.b.length
+    ? captured.b.map((p) => unicodePieces[p.color][p.type]).join(" ")
     : "—";
 }
 
