@@ -1,407 +1,354 @@
-const boardEl = document.getElementById("board");
-const statusEl = document.getElementById("status");
-const checkStatusEl = document.getElementById("check-status");
-const moveListEl = document.getElementById("move-list");
-const capturedWhiteEl = document.getElementById("captured-white");
-const capturedBlackEl = document.getElementById("captured-black");
-const startPauseBtn = document.getElementById("start-pause");
-const resetBtn = document.getElementById("reset");
-const whiteTimeEl = document.getElementById("white-time");
-const blackTimeEl = document.getElementById("black-time");
-const whiteClockCard = document.getElementById("clock-white");
-const blackClockCard = document.getElementById("clock-black");
+const API_BASE = "https://financialmodelingprep.com/api/v3";
+const API_KEY = "demo";
 
-const unicodePieces = {
-  w: { king: "♔", queen: "♕", rook: "♖", bishop: "♗", knight: "♘", pawn: "♙" },
-  b: { king: "♚", queen: "♛", rook: "♜", bishop: "♝", knight: "♞", pawn: "♟" },
+const TOP_100_US_SYMBOLS = [
+  "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "GOOG", "META", "BRK-B", "LLY", "AVGO",
+  "TSLA", "JPM", "V", "WMT", "XOM", "UNH", "MA", "JNJ", "PG", "ORCL",
+  "HD", "COST", "BAC", "ABBV", "KO", "NFLX", "CRM", "MRK", "CVX", "AMD",
+  "ADBE", "PEP", "TMO", "CSCO", "MCD", "LIN", "ABT", "WFC", "DIS", "ACN",
+  "DHR", "TXN", "INTU", "VZ", "AMAT", "QCOM", "CMCSA", "PFE", "PM", "CAT",
+  "IBM", "RTX", "SPGI", "GE", "GS", "NOW", "UBER", "ISRG", "BKNG", "BLK",
+  "LOW", "HON", "UNP", "MS", "AXP", "DE", "SYK", "NEE", "AMGN", "TJX",
+  "SCHW", "T", "ADP", "MDT", "C", "VRTX", "ELV", "GILD", "LRCX", "MU",
+  "SBUX", "PGR", "MMC", "COP", "MO", "CB", "NKE", "SO", "REGN", "MDLZ",
+  "ADI", "PLD", "BMY", "UPS", "PANW", "INTC", "CI", "BA", "KKR", "EQIX"
+];
+
+const elements = {
+  search: document.getElementById("search"),
+  sector: document.getElementById("sector"),
+  minMarketCap: document.getElementById("minMarketCap"),
+  minPrice: document.getElementById("minPrice"),
+  changeDirection: document.getElementById("changeDirection"),
+  refreshBtn: document.getElementById("refreshBtn"),
+  resetBtn: document.getElementById("resetBtn"),
+  period: document.getElementById("period"),
+  resultCount: document.getElementById("resultCount"),
+  summary: document.getElementById("summary"),
+  tableBody: document.getElementById("tableBody"),
+  statusLine: document.getElementById("statusLine"),
+  chartTitle: document.getElementById("chartTitle"),
+  chartCanvas: document.getElementById("chartCanvas"),
 };
 
-const directions = {
-  bishop: [[1, 1], [1, -1], [-1, 1], [-1, -1]],
-  rook: [[1, 0], [-1, 0], [0, 1], [0, -1]],
-  queen: [[1, 1], [1, -1], [-1, 1], [-1, -1], [1, 0], [-1, 0], [0, 1], [0, -1]],
-  king: [[1, 1], [1, -1], [-1, 1], [-1, -1], [1, 0], [-1, 0], [0, 1], [0, -1]],
+const state = {
+  rows: [],
+  filteredRows: [],
+  sort: { key: "marketCap", direction: "desc" },
+  selectedSymbol: null,
+  chart: [],
 };
 
-const initialTimeSeconds = 5 * 60;
-let clock = { w: initialTimeSeconds, b: initialTimeSeconds };
-let activeColor = "w";
-let selectedSquare = null;
-let legalMoves = [];
-let captured = { w: [], b: [] };
-let moveHistory = [];
-let gameRunning = false;
-let gameOver = false;
-let timerId = null;
+const formatter = {
+  compact: new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 2 }),
+  price: new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }),
+  percent: new Intl.NumberFormat("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+};
 
-let boardState = createInitialBoard();
-
-function createInitialBoard() {
-  return [
-    [piece("rook", "b"), piece("knight", "b"), piece("bishop", "b"), piece("queen", "b"), piece("king", "b"), piece("bishop", "b"), piece("knight", "b"), piece("rook", "b")],
-    Array.from({ length: 8 }, () => piece("pawn", "b")),
-    Array(8).fill(null),
-    Array(8).fill(null),
-    Array(8).fill(null),
-    Array(8).fill(null),
-    Array.from({ length: 8 }, () => piece("pawn", "w")),
-    [piece("rook", "w"), piece("knight", "w"), piece("bishop", "w"), piece("queen", "w"), piece("king", "w"), piece("bishop", "w"), piece("knight", "w"), piece("rook", "w")],
-  ];
-}
-
-function piece(type, color) {
-  return { type, color };
-}
-
-function toNotation(row, col) {
-  return `${String.fromCharCode(97 + col)}${8 - row}`;
-}
-
-function formatTime(totalSeconds) {
-  const min = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
-  const sec = String(totalSeconds % 60).padStart(2, "0");
-  return `${min}:${sec}`;
-}
-
-function inBounds(row, col) {
-  return row >= 0 && row < 8 && col >= 0 && col < 8;
-}
-
-function cloneBoard(board) {
-  return board.map((row) => row.map((cell) => (cell ? { ...cell } : null)));
-}
-
-function renderBoard() {
-  boardEl.innerHTML = "";
-
-  for (let row = 0; row < 8; row += 1) {
-    for (let col = 0; col < 8; col += 1) {
-      const cell = boardState[row][col];
-      const square = document.createElement("button");
-      square.className = `square ${(row + col) % 2 === 0 ? "light" : "dark"}`;
-      square.dataset.row = row;
-      square.dataset.col = col;
-
-      if (cell) {
-        square.textContent = unicodePieces[cell.color][cell.type];
-      }
-
-      if (selectedSquare && selectedSquare.row === row && selectedSquare.col === col) {
-        square.classList.add("selected");
-      }
-
-      const move = legalMoves.find((item) => item.row === row && item.col === col);
-      if (move) {
-        square.classList.add(move.capture ? "capture" : "legal");
-      }
-
-      square.addEventListener("click", handleSquareClick);
-      boardEl.appendChild(square);
-    }
+async function fetchJson(url) {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(`API error ${response.status}: ${response.statusText}`);
   }
-
-  updateClocks();
+  return response.json();
 }
 
-function handleSquareClick(event) {
-  if (gameOver) return;
+async function loadScreenerData() {
+  elements.statusLine.textContent = "Loading live quote and profile data…";
 
-  const row = Number(event.currentTarget.dataset.row);
-  const col = Number(event.currentTarget.dataset.col);
-  const clickedPiece = boardState[row][col];
+  const symbols = TOP_100_US_SYMBOLS.join(",");
+  const quotesUrl = `${API_BASE}/quote/${encodeURIComponent(symbols)}?apikey=${API_KEY}`;
+  const profileUrl = `${API_BASE}/profile/${encodeURIComponent(symbols)}?apikey=${API_KEY}`;
 
-  if (!selectedSquare) {
-    if (!clickedPiece || clickedPiece.color !== activeColor) return;
-    selectedSquare = { row, col };
-    legalMoves = getLegalMoves(boardState, row, col);
-    renderBoard();
+  const [quotes, profiles] = await Promise.all([fetchJson(quotesUrl), fetchJson(profileUrl)]);
+  const profileMap = new Map(profiles.map((item) => [item.symbol, item]));
+
+  state.rows = quotes
+    .filter((quote) => quote.symbol)
+    .map((quote) => {
+      const profile = profileMap.get(quote.symbol) || {};
+      return {
+        symbol: quote.symbol,
+        name: quote.name || profile.companyName || "—",
+        sector: profile.sector || "Unknown",
+        price: quote.price || 0,
+        changePercent: quote.changesPercentage || 0,
+        marketCap: quote.marketCap || profile.mktCap || 0,
+        volume: quote.volume || 0,
+      };
+    });
+
+  updateSectorFilter();
+  applyFiltersAndRender();
+
+  elements.statusLine.textContent = `Live connection established with Financial Modeling Prep. Loaded ${state.rows.length} symbols.`;
+
+  if (!state.selectedSymbol && state.filteredRows.length) {
+    selectSymbol(state.filteredRows[0].symbol);
+  }
+}
+
+function updateSectorFilter() {
+  const sectors = [...new Set(state.rows.map((row) => row.sector).filter(Boolean))].sort();
+  const currentValue = elements.sector.value;
+
+  elements.sector.innerHTML = '<option value="all">All sectors</option>';
+  sectors.forEach((sector) => {
+    const option = document.createElement("option");
+    option.value = sector;
+    option.textContent = sector;
+    elements.sector.appendChild(option);
+  });
+
+  if (sectors.includes(currentValue)) {
+    elements.sector.value = currentValue;
+  }
+}
+
+function applyFiltersAndRender() {
+  const term = elements.search.value.trim().toLowerCase();
+  const sector = elements.sector.value;
+  const minMarketCap = Number(elements.minMarketCap.value || 0) * 1_000_000_000;
+  const minPrice = Number(elements.minPrice.value || 0);
+  const direction = elements.changeDirection.value;
+
+  state.filteredRows = state.rows.filter((row) => {
+    const textPass = !term || row.symbol.toLowerCase().includes(term) || row.name.toLowerCase().includes(term);
+    const sectorPass = sector === "all" || row.sector === sector;
+    const capPass = row.marketCap >= minMarketCap;
+    const pricePass = row.price >= minPrice;
+    const directionPass =
+      direction === "all" ||
+      (direction === "gainers" && row.changePercent > 0) ||
+      (direction === "losers" && row.changePercent < 0);
+
+    return textPass && sectorPass && capPass && pricePass && directionPass;
+  });
+
+  const { key, direction: sortDirection } = state.sort;
+  state.filteredRows.sort((a, b) => {
+    const left = a[key];
+    const right = b[key];
+
+    if (typeof left === "string") {
+      return sortDirection === "asc" ? left.localeCompare(right) : right.localeCompare(left);
+    }
+    return sortDirection === "asc" ? left - right : right - left;
+  });
+
+  renderSummary();
+  renderTable();
+}
+
+function renderSummary() {
+  const rows = state.filteredRows;
+  const gainers = rows.filter((row) => row.changePercent > 0).length;
+  const losers = rows.filter((row) => row.changePercent < 0).length;
+  const avgMove = rows.length ? rows.reduce((sum, row) => sum + row.changePercent, 0) / rows.length : 0;
+  const totalCap = rows.reduce((sum, row) => sum + row.marketCap, 0);
+
+  elements.summary.innerHTML = `
+    <article>
+      <p>Results</p>
+      <h3>${rows.length}</h3>
+    </article>
+    <article>
+      <p>Gainers / Losers</p>
+      <h3>${gainers} / ${losers}</h3>
+    </article>
+    <article>
+      <p>Average Day Move</p>
+      <h3 class="${avgMove >= 0 ? "up" : "down"}">${formatter.percent.format(avgMove)}%</h3>
+    </article>
+    <article>
+      <p>Total Market Cap</p>
+      <h3>${formatter.compact.format(totalCap)}</h3>
+    </article>
+  `;
+
+  elements.resultCount.textContent = `${rows.length} rows`;
+}
+
+function renderTable() {
+  elements.tableBody.innerHTML = "";
+
+  if (!state.filteredRows.length) {
+    const tr = document.createElement("tr");
+    tr.innerHTML = '<td colspan="7" class="empty">No companies match the selected filters.</td>';
+    elements.tableBody.appendChild(tr);
     return;
   }
 
-  const move = legalMoves.find((item) => item.row === row && item.col === col);
-  if (move) {
-    applyMove(selectedSquare, { row, col });
-    return;
-  }
-
-  if (clickedPiece && clickedPiece.color === activeColor) {
-    selectedSquare = { row, col };
-    legalMoves = getLegalMoves(boardState, row, col);
-  } else {
-    selectedSquare = null;
-    legalMoves = [];
-  }
-
-  renderBoard();
-}
-
-function applyMove(from, to) {
-  if (!gameRunning) {
-    gameRunning = true;
-    startPauseBtn.textContent = "Pause Clock";
-    startTimer();
-  }
-
-  const moved = boardState[from.row][from.col];
-  const target = boardState[to.row][to.col];
-  boardState[to.row][to.col] = moved;
-  boardState[from.row][from.col] = null;
-
-  if (moved.type === "pawn" && (to.row === 0 || to.row === 7)) {
-    moved.type = "queen";
-  }
-
-  if (target) {
-    captured[activeColor].push(target);
-  }
-
-  moveHistory.push(`${moved.color === "w" ? "White" : "Black"}: ${moved.type} ${toNotation(from.row, from.col)} → ${toNotation(to.row, to.col)}`);
-
-  activeColor = activeColor === "w" ? "b" : "w";
-  selectedSquare = null;
-  legalMoves = [];
-
-  evaluateGameState();
-  renderBoard();
-}
-
-function getPseudoMoves(board, row, col, respectCheck = true) {
-  const p = board[row][col];
-  if (!p) return [];
-
-  const moves = [];
-
-  if (p.type === "pawn") {
-    const step = p.color === "w" ? -1 : 1;
-    const startRow = p.color === "w" ? 6 : 1;
-    const oneAhead = row + step;
-
-    if (inBounds(oneAhead, col) && !board[oneAhead][col]) {
-      moves.push({ row: oneAhead, col, capture: false });
-      const twoAhead = row + 2 * step;
-      if (row === startRow && !board[twoAhead][col]) {
-        moves.push({ row: twoAhead, col, capture: false });
-      }
+  state.filteredRows.forEach((row) => {
+    const tr = document.createElement("tr");
+    if (row.symbol === state.selectedSymbol) {
+      tr.classList.add("selected");
     }
 
-    [-1, 1].forEach((offset) => {
-      const nextCol = col + offset;
-      if (!inBounds(oneAhead, nextCol)) return;
-      const pieceAtDiag = board[oneAhead][nextCol];
-      if (pieceAtDiag && pieceAtDiag.color !== p.color) {
-        moves.push({ row: oneAhead, col: nextCol, capture: true });
-      }
-    });
-  }
+    tr.innerHTML = `
+      <td><button class="linkish" data-symbol="${row.symbol}">${row.symbol}</button></td>
+      <td>${row.name}</td>
+      <td>${row.sector}</td>
+      <td>${formatter.price.format(row.price)}</td>
+      <td class="${row.changePercent >= 0 ? "up" : "down"}">${formatter.percent.format(row.changePercent)}%</td>
+      <td>${formatter.compact.format(row.marketCap)}</td>
+      <td>${formatter.compact.format(row.volume)}</td>
+    `;
 
-  if (p.type === "knight") {
-    const jumps = [[2, 1], [2, -1], [-2, 1], [-2, -1], [1, 2], [1, -2], [-1, 2], [-1, -2]];
-    jumps.forEach(([dr, dc]) => {
-      const nr = row + dr;
-      const nc = col + dc;
-      if (!inBounds(nr, nc)) return;
-      const target = board[nr][nc];
-      if (!target || target.color !== p.color) {
-        moves.push({ row: nr, col: nc, capture: Boolean(target) });
-      }
-    });
-  }
-
-  if (["bishop", "rook", "queen"].includes(p.type)) {
-    directions[p.type].forEach(([dr, dc]) => {
-      let nr = row + dr;
-      let nc = col + dc;
-      while (inBounds(nr, nc)) {
-        const target = board[nr][nc];
-        if (!target) {
-          moves.push({ row: nr, col: nc, capture: false });
-        } else {
-          if (target.color !== p.color) {
-            moves.push({ row: nr, col: nc, capture: true });
-          }
-          break;
-        }
-        nr += dr;
-        nc += dc;
-      }
-    });
-  }
-
-  if (p.type === "king") {
-    directions.king.forEach(([dr, dc]) => {
-      const nr = row + dr;
-      const nc = col + dc;
-      if (!inBounds(nr, nc)) return;
-      const target = board[nr][nc];
-      if (!target || target.color !== p.color) {
-        moves.push({ row: nr, col: nc, capture: Boolean(target) });
-      }
-    });
-  }
-
-  if (!respectCheck) return moves;
-
-  return moves.filter((move) => {
-    const testBoard = cloneBoard(board);
-    testBoard[move.row][move.col] = testBoard[row][col];
-    testBoard[row][col] = null;
-    return !isKingInCheck(testBoard, p.color);
+    elements.tableBody.appendChild(tr);
   });
 }
 
-function getLegalMoves(board, row, col) {
-  return getPseudoMoves(board, row, col, true);
+async function loadChartData(symbol, days) {
+  const url = `${API_BASE}/historical-price-full/${encodeURIComponent(symbol)}?timeseries=${days}&apikey=${API_KEY}`;
+  const data = await fetchJson(url);
+  return (data.historical || []).map((item) => ({ date: item.date, close: item.close })).reverse();
 }
 
-function findKing(board, color) {
-  for (let row = 0; row < 8; row += 1) {
-    for (let col = 0; col < 8; col += 1) {
-      const p = board[row][col];
-      if (p && p.type === "king" && p.color === color) {
-        return { row, col };
-      }
-    }
-  }
-  return null;
-}
+function drawChart(series) {
+  const canvas = elements.chartCanvas;
+  const ctx = canvas.getContext("2d");
+  const width = canvas.width;
+  const height = canvas.height;
 
-function isKingInCheck(board, color) {
-  const kingPos = findKing(board, color);
-  if (!kingPos) return true;
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = "#0d1223";
+  ctx.fillRect(0, 0, width, height);
 
-  for (let row = 0; row < 8; row += 1) {
-    for (let col = 0; col < 8; col += 1) {
-      const p = board[row][col];
-      if (!p || p.color === color) continue;
-      const attacks = getPseudoMoves(board, row, col, false);
-      if (attacks.some((a) => a.row === kingPos.row && a.col === kingPos.col)) {
-        return true;
-      }
-    }
+  if (!series.length) {
+    ctx.fillStyle = "#a6b3d6";
+    ctx.font = "16px Inter, sans-serif";
+    ctx.fillText("No chart data available.", 24, height / 2);
+    return;
   }
 
-  return false;
-}
+  const closes = series.map((point) => point.close);
+  const min = Math.min(...closes);
+  const max = Math.max(...closes);
+  const pad = 36;
+  const innerW = width - pad * 2;
+  const innerH = height - pad * 2;
+  const spread = max - min || 1;
 
-function sideHasLegalMove(board, color) {
-  for (let row = 0; row < 8; row += 1) {
-    for (let col = 0; col < 8; col += 1) {
-      const p = board[row][col];
-      if (p && p.color === color) {
-        const moves = getLegalMoves(board, row, col);
-        if (moves.length) return true;
-      }
-    }
-  }
-  return false;
-}
+  ctx.strokeStyle = "rgba(255,255,255,0.12)";
+  ctx.lineWidth = 1;
+  [0, 0.5, 1].forEach((tick) => {
+    const y = pad + innerH * tick;
+    ctx.beginPath();
+    ctx.moveTo(pad, y);
+    ctx.lineTo(width - pad, y);
+    ctx.stroke();
+  });
 
-function evaluateGameState() {
-  const check = isKingInCheck(boardState, activeColor);
-  const hasMove = sideHasLegalMove(boardState, activeColor);
-  const activeName = activeColor === "w" ? "White" : "Black";
+  ctx.strokeStyle = "#56f6a9";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
 
-  statusEl.textContent = `${activeName} to move.`;
-  checkStatusEl.textContent = check ? `${activeName} is in check.` : "No check.";
+  series.forEach((point, index) => {
+    const x = pad + (index / (series.length - 1 || 1)) * innerW;
+    const y = pad + ((max - point.close) / spread) * innerH;
 
-  if (!hasMove) {
-    gameOver = true;
-    gameRunning = false;
-    clearInterval(timerId);
-
-    if (check) {
-      const winner = activeColor === "w" ? "Black" : "White";
-      statusEl.textContent = `Checkmate! ${winner} wins.`;
-      checkStatusEl.textContent = "Game over.";
+    if (index === 0) {
+      ctx.moveTo(x, y);
     } else {
-      statusEl.textContent = "Stalemate. It's a draw.";
-      checkStatusEl.textContent = "Game over.";
+      ctx.lineTo(x, y);
     }
-  }
+  });
 
-  renderMoveHistory();
-  renderCaptured();
+  ctx.stroke();
+
+  ctx.fillStyle = "#c7d2f0";
+  ctx.font = "12px Inter, sans-serif";
+  ctx.fillText(`High ${formatter.price.format(max)}`, pad, 18);
+  ctx.fillText(`Low ${formatter.price.format(min)}`, width - 130, 18);
 }
 
-function renderMoveHistory() {
-  moveListEl.innerHTML = "";
-  moveHistory.forEach((move) => {
-    const li = document.createElement("li");
-    li.textContent = move;
-    moveListEl.appendChild(li);
+async function selectSymbol(symbol) {
+  state.selectedSymbol = symbol;
+  renderTable();
+
+  const days = Number(elements.period.value);
+  elements.chartTitle.textContent = `Loading ${symbol} chart…`;
+
+  try {
+    state.chart = await loadChartData(symbol, days);
+    drawChart(state.chart);
+
+    const latest = state.chart[state.chart.length - 1];
+    elements.chartTitle.textContent = latest
+      ? `${symbol} · ${formatter.price.format(latest.close)} · ${days} day history`
+      : `${symbol} · no chart data`;
+  } catch (error) {
+    elements.chartTitle.textContent = `${symbol} · failed to load chart`;
+    drawChart([]);
+    elements.statusLine.textContent = `Chart request failed: ${error.message}`;
+  }
+}
+
+function resetFilters() {
+  elements.search.value = "";
+  elements.sector.value = "all";
+  elements.minMarketCap.value = "";
+  elements.minPrice.value = "";
+  elements.changeDirection.value = "all";
+  applyFiltersAndRender();
+}
+
+function wireEvents() {
+  [
+    elements.search,
+    elements.sector,
+    elements.minMarketCap,
+    elements.minPrice,
+    elements.changeDirection,
+  ].forEach((input) => input.addEventListener("input", applyFiltersAndRender));
+
+  elements.refreshBtn.addEventListener("click", async () => {
+    try {
+      await loadScreenerData();
+    } catch (error) {
+      elements.statusLine.textContent = `Quote request failed: ${error.message}`;
+    }
+  });
+
+  elements.resetBtn.addEventListener("click", resetFilters);
+
+  elements.period.addEventListener("change", () => {
+    if (state.selectedSymbol) {
+      selectSymbol(state.selectedSymbol);
+    }
+  });
+
+  document.querySelectorAll("th[data-sort]").forEach((th) => {
+    th.addEventListener("click", () => {
+      const key = th.dataset.sort;
+      if (state.sort.key === key) {
+        state.sort.direction = state.sort.direction === "asc" ? "desc" : "asc";
+      } else {
+        state.sort.key = key;
+        state.sort.direction = key === "name" || key === "symbol" || key === "sector" ? "asc" : "desc";
+      }
+      applyFiltersAndRender();
+    });
+  });
+
+  elements.tableBody.addEventListener("click", (event) => {
+    const symbol = event.target.dataset.symbol;
+    if (symbol) {
+      selectSymbol(symbol);
+    }
   });
 }
 
-function renderCaptured() {
-  capturedWhiteEl.textContent = captured.w.length
-    ? captured.w.map((p) => unicodePieces[p.color][p.type]).join(" ")
-    : "—";
+async function init() {
+  wireEvents();
+  drawChart([]);
 
-  capturedBlackEl.textContent = captured.b.length
-    ? captured.b.map((p) => unicodePieces[p.color][p.type]).join(" ")
-    : "—";
-}
-
-function updateClocks() {
-  whiteTimeEl.textContent = formatTime(clock.w);
-  blackTimeEl.textContent = formatTime(clock.b);
-
-  whiteClockCard.classList.toggle("active", activeColor === "w" && gameRunning && !gameOver);
-  blackClockCard.classList.toggle("active", activeColor === "b" && gameRunning && !gameOver);
-}
-
-function startTimer() {
-  clearInterval(timerId);
-  timerId = setInterval(() => {
-    if (!gameRunning || gameOver) return;
-
-    clock[activeColor] -= 1;
-    if (clock[activeColor] <= 0) {
-      clock[activeColor] = 0;
-      gameOver = true;
-      gameRunning = false;
-      clearInterval(timerId);
-      const winner = activeColor === "w" ? "Black" : "White";
-      statusEl.textContent = `Time out! ${winner} wins.`;
-      checkStatusEl.textContent = "Game over.";
-      startPauseBtn.textContent = "Start Clock";
-    }
-
-    updateClocks();
-  }, 1000);
-}
-
-function toggleClock() {
-  if (gameOver) return;
-  gameRunning = !gameRunning;
-  startPauseBtn.textContent = gameRunning ? "Pause Clock" : "Start Clock";
-  if (gameRunning) {
-    startTimer();
+  try {
+    await loadScreenerData();
+  } catch (error) {
+    elements.statusLine.textContent = `Connection failed. ${error.message}. If demo key is throttled, replace API_KEY with your own free key.`;
   }
-  updateClocks();
 }
 
-function resetGame() {
-  clearInterval(timerId);
-  boardState = createInitialBoard();
-  clock = { w: initialTimeSeconds, b: initialTimeSeconds };
-  activeColor = "w";
-  selectedSquare = null;
-  legalMoves = [];
-  captured = { w: [], b: [] };
-  moveHistory = [];
-  gameRunning = false;
-  gameOver = false;
-  statusEl.textContent = "White to move.";
-  checkStatusEl.textContent = "No check.";
-  startPauseBtn.textContent = "Start Clock";
-  renderMoveHistory();
-  renderCaptured();
-  renderBoard();
-}
-
-startPauseBtn.addEventListener("click", toggleClock);
-resetBtn.addEventListener("click", resetGame);
-
-renderCaptured();
-renderBoard();
+init();
