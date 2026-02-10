@@ -3,64 +3,96 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Interactive Chess Duel</title>
+    <title>US Top 100 Stock Screener</title>
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
-    <main class="layout">
-      <section class="board-panel">
-        <header class="panel-header">
-          <p class="eyebrow">1 vs 1 Chess Arena</p>
-          <h1>Play, Think, and Beat the Clock</h1>
-          <p>
-            Click a piece to see legal moves, then click a highlighted square to move.
-            White starts first.
-          </p>
-        </header>
+    <main class="app-shell">
+      <header class="hero">
+        <p class="eyebrow">Live Market Dashboard</p>
+        <h1>US Top 100 Stock Screener</h1>
+        <p>
+          Data source: Financial Modeling Prep (public API). Quotes are loaded live and can be filtered,
+          sorted, and explored in the chart panel.
+        </p>
+      </header>
 
-        <div class="clock-row">
-          <article class="clock" id="clock-white">
-            <h2>White</h2>
-            <p id="white-time">05:00</p>
-          </article>
-          <article class="clock" id="clock-black">
-            <h2>Black</h2>
-            <p id="black-time">05:00</p>
-          </article>
+      <section class="panel filters">
+        <div class="field">
+          <label for="search">Search</label>
+          <input id="search" type="search" placeholder="Ticker or company name" />
         </div>
 
-        <div id="board" class="board" aria-label="Chessboard"></div>
+        <div class="field">
+          <label for="sector">Sector</label>
+          <select id="sector">
+            <option value="all">All sectors</option>
+          </select>
+        </div>
 
-        <div class="controls">
-          <button id="start-pause" class="primary">Start Clock</button>
-          <button id="reset" class="ghost">Reset Game</button>
+        <div class="field">
+          <label for="minMarketCap">Min market cap (B USD)</label>
+          <input id="minMarketCap" type="number" min="0" step="10" placeholder="0" />
+        </div>
+
+        <div class="field">
+          <label for="minPrice">Min price (USD)</label>
+          <input id="minPrice" type="number" min="0" step="1" placeholder="0" />
+        </div>
+
+        <div class="field">
+          <label for="changeDirection">Day move</label>
+          <select id="changeDirection">
+            <option value="all">Any</option>
+            <option value="gainers">Gainers only</option>
+            <option value="losers">Losers only</option>
+          </select>
+        </div>
+
+        <div class="field controls">
+          <button id="refreshBtn" class="primary">Refresh live data</button>
+          <button id="resetBtn" class="ghost">Reset filters</button>
         </div>
       </section>
 
-      <aside class="sidebar">
-        <section class="status-card">
-          <h2>Game Status</h2>
-          <p id="status">White to move.</p>
-          <p id="check-status">No check.</p>
-        </section>
+      <section class="panel summary" id="summary"></section>
 
-        <section class="status-card">
-          <h2>Captured Pieces</h2>
-          <div class="captured-row">
-            <h3>White captured</h3>
-            <p id="captured-white">—</p>
-          </div>
-          <div class="captured-row">
-            <h3>Black captured</h3>
-            <p id="captured-black">—</p>
-          </div>
-        </section>
+      <section class="panel chart-panel">
+        <div class="chart-header">
+          <h2 id="chartTitle">Select a stock to load chart</h2>
+          <select id="period">
+            <option value="30">1M</option>
+            <option value="90" selected>3M</option>
+            <option value="180">6M</option>
+            <option value="365">1Y</option>
+          </select>
+        </div>
+        <canvas id="chartCanvas" width="960" height="320" aria-label="Price chart"></canvas>
+      </section>
 
-        <section class="status-card moves-card">
-          <h2>Moves</h2>
-          <ol id="move-list"></ol>
-        </section>
-      </aside>
+      <section class="panel table-panel">
+        <div class="table-header">
+          <h2>Top 100 Universe</h2>
+          <p id="resultCount">Loading…</p>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th data-sort="symbol">Ticker</th>
+                <th data-sort="name">Company</th>
+                <th data-sort="sector">Sector</th>
+                <th data-sort="price">Price</th>
+                <th data-sort="changePercent">Day %</th>
+                <th data-sort="marketCap">Market Cap</th>
+                <th data-sort="volume">Volume</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+        <p class="status" id="statusLine"></p>
+      </section>
     </main>
 
     <script src="script.js"></script>
